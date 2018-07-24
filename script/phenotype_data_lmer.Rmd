@@ -7,6 +7,177 @@ output:
     keep_md: yes
 ---
 
+### Goal of this script:   
+check whether "leave #", "internode #", "plant height (sum of internode length)", "leafl average", "leafw average", and "petiole length average" are significantly different between trt and gt 
+
+### load libs 
+```{r}
+library(lmerTest) #loads lmerTest and lme4
+library(tidyverse)
+library(brms)
+library(cowplot)
+source("script/helper.R")  
+```
+
+### maximum likelihood method, lmer 
+
+several Q: 
+
+Q: why I decided only to show height, leaf length, and leaft width? A: Because they are the only shared phenotype measures between GH and GC 
+
+```{r}
+# 1) import data and reformat data 
+setwd("~/Desktop/rapa_paper/Li_Rapa_Transcriptome_2018/")
+GC.pheno <- read.csv("input/shade_avoidance_expt_in_GC.csv",na.string=c("NA","N/A")) # replace all NA w/ N/A (the standard missing data format in R)
+GH.pheno <- read.csv("input/shade_avoidance_expt_in_GH.csv", na.string=c("NA","N/A")) 
+
+head(GC.pheno)
+head(GH.pheno)
+
+summary(GC.pheno)
+summary(GH.pheno)
+
+names(GC.pheno)[3] <- "gt"
+GC.pheno$rep <- as.factor(str_sub(GC.pheno$barcode,-2,-2))  # 8 reps 
+GC.pheno$height <- GC.pheno$No..of.internodes * GC.pheno$intleng 
+head(GC.pheno)
+GC.pheno.data <- GC.pheno[, c("gt", "trt", "leaves", "No..of.internodes", "leafl", "leafw", "petleng", "rep", "height")]
+colnames(GC.pheno.data) <- c("gt", "trt", "leaf_No", "internode_No", "leafl_ave", "leafw_ave", "petleng_ave", "rep", "height") 
+
+GH.pheno$rep <- as.factor(GH.pheno$rep)
+GH.pheno$petleng_ave <- round(rowMeans(subset(GH.pheno, select=c("pet1", "pet2", "pet3")), na.rm = T), digits = 1)
+GH.pheno.data <- GH.pheno[, c("trt", "rep", "intleng", "leafleng", "leafwid", "leafnum", "internum", "species", "petleng_ave")]
+colnames(GH.pheno.data) <- c("trt", "rep", "height", "leafl_ave", "leafw_ave", "leaf_No", "internode_No", "gt", "petleng_ave")
+head(GH.pheno.data)
+
+# 2) visualize outcome distribution 
+pheno.plot(GC.pheno.data, GC.pheno.data$height) 
+pheno.plot(GH.pheno.data, GH.pheno.data$height)
+
+# 3) mixed-effect linear model selection (rep as random effect), using all original data scale
+# GC
+# R500_SUN as ref 
+# set reference level 
+GC.pheno.data$trt <- relevel(GC.pheno.data$trt, ref = "SUN")
+GC.pheno.data$gt <- relevel(GC.pheno.data$gt, ref = "R500")
+
+lmer.leafl_ave.GC <- lmer(leafl_ave ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.leafl_ave.GC <- summary(lmer.leafl_ave.GC)$coefficient
+
+lmer.leafw_ave.GC <- lmer(leafw_ave ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.leafw_ave.GC <- summary(lmer.leafw_ave.GC)$coefficient
+
+lmer.height.GC <- lmer(height ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.height.GC <- summary(lmer.height.GC)$coefficient
+
+# IMB211_SUN as ref
+# set reference level 
+GC.pheno.data$trt <- relevel(GC.pheno.data$trt, ref = "SUN")
+GC.pheno.data$gt <- relevel(GC.pheno.data$gt, ref = "IMB211")
+
+lmer.leafl_ave.GC.2 <- lmer(leafl_ave ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.leafl_ave.GC.2 <- summary(lmer.leafl_ave.GC.2)$coefficient
+
+lmer.leafw_ave.GC.2 <- lmer(leafw_ave ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.leafw_ave.GC.2 <- summary(lmer.leafw_ave.GC.2)$coefficient
+
+lmer.height.GC.2 <- lmer(height ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.height.GC.2 <- summary(lmer.height.GC.2)$coefficient
+
+# GH 
+# R500_SUN as ref level 
+GH.pheno.data$trt <- relevel(GH.pheno.data$trt, ref = "ND")
+GH.pheno.data$gt <- relevel(GH.pheno.data$gt, ref = "R500")
+
+lmer.height.GH <- lmer(height ~ gt * trt + (1|rep), data = GH.pheno.data)
+summary.height.GH <- summary(lmer.height.GH)$coefficient
+
+lmer.leafl_ave.GH <- lmer(leafl_ave ~ gt * trt + (1|rep), data = GH.pheno.data)
+summary.leafl_ave.GH <- summary(lmer.leafl_ave.GH)$coefficient
+
+lmer.leafw_ave.GH <- lmer(leafw_ave ~ gt * trt + (1|rep), data = GH.pheno.data)
+summary.leafw_ave.GH <- summary(lmer.leafw_ave.GH)$coefficient
+
+# IMB211_SUN as ref level 
+GH.pheno.data$trt <- relevel(GH.pheno.data$trt, ref = "ND")
+GH.pheno.data$gt <- relevel(GH.pheno.data$gt, ref = "IMB211")
+
+lmer.height.GH.2 <- lmer(height ~ gt * trt + (1|rep), data = GH.pheno.data)
+summary.height.GH.2 <- summary(lmer.height.GH.2)$coefficient
+
+lmer.leafl_ave.GH.2 <- lmer(leafl_ave ~ gt * trt + (1|rep), data = GH.pheno.data)
+summary.leafl_ave.GH.2 <- summary(lmer.leafl_ave.GH.2)$coefficient
+
+lmer.leafw_ave.GH.2 <- lmer(leafw_ave ~ gt * trt + (1|rep), data = GH.pheno.data)
+summary.leafw_ave.GH.2 <- summary(lmer.leafw_ave.GH.2)$coefficient
+
+# 4) display lmer result 
+plot.leafl_ave.GC <- pheno.plot.result.GC(summary.leafl_ave.GC, summary.leafl_ave.GC.2)
+plot.leafw_ave.GC <- pheno.plot.result.GC(summary.leafw_ave.GC, summary.leafw_ave.GC.2)
+plot.height.GC <- pheno.plot.result.GC(summary.height.GC, summary.height.GC.2)
+
+plot.height.GH <- pheno.plot.result.GH(summary.height.GH, summary.height.GH.2)
+plot.leafl_ave.GH <- pheno.plot.result.GH(summary.leafl_ave.GH, summary.leafl_ave.GH.2)
+plot.leafw_ave.GH <- pheno.plot.result.GH(summary.leafw_ave.GH, summary.leafw_ave.GH.2)
+
+plot.all.paper <-plot_grid(
+  plot.height.GC+theme(legend.position="none",axis.text.x=element_blank())+labs(title="plant height", y="Growth Chamber\n mm"),
+  plot.leafl_ave.GC+theme(legend.position="none",axis.text.x=element_blank())+labs(title="leaf length", y="mm"),
+  plot.leafw_ave.GC+theme(legend.position="none",axis.text.x=element_blank())+labs(title="leaf width", y="mm", fill=""),
+  plot.height.GH+theme(legend.position=c("none"),axis.text.x=element_blank())+labs(title=" ", y="Greenhouse\n mm"),
+  plot.leafl_ave.GH+theme(legend.position="none",axis.text.x=element_blank())+labs(title=" ", y="mm"),
+  plot.leafw_ave.GH+theme(legend.position="none",axis.text.x=element_blank())+labs(title=" ", y="mm", x="", fill=""),
+  ncol=3, nrow = 2,labels=c("","","",""))  
+
+legend <- get_legend(plot.height.GC)
+plot.all.paper.final <- plot_grid(plot.all.paper, legend, rel_widths = c(6, 1))
+
+# save_plot("output/figure1.png", plot.all.paper.final, ncol = 3, nrow = 2,base_aspect_ratio = 0.8)  
+```
+
+### Julin asked: 
+
+Is the greater response of R500 was true both on an abosolute scale and relative to height under high R/FR? log2 transform the data to see the result, look at percentage change, this is based on log(yt)−log(yt−1)=log(yt/yt−1), and yt/yt−1 is 1 plus the percentage change, check this for plant height only  
+
+```{r}
+pheno.plot.log2(GC.pheno.data, GC.pheno.data$height)
+
+# log2 transform GC. height 
+GC.pheno.data$height_log2 <- log2(GC.pheno.data$height)
+
+# fit model 
+# R500_SUN as ref 
+# set reference level 
+GC.pheno.data$trt <- relevel(GC.pheno.data$trt, ref = "SUN")
+GC.pheno.data$gt <- relevel(GC.pheno.data$gt, ref = "R500")
+lmer.height.GC <- lmer(height_log2 ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.height.GC <- summary(lmer.height.GC)$coefficient
+summary(lmer.height.GC)
+# Fixed effects:
+#                   Estimate Std. Error      df t value Pr(>|t|)    
+# (Intercept)         6.7081     0.1739 27.0000  38.575  < 2e-16 ***
+# gtIMB211           -1.4618     0.2459 27.0000  -5.944 2.45e-06 ***
+# trtSHADE            0.9951     0.2459 27.0000   3.909 0.000563 ***
+# gtIMB211:trtSHADE  -0.3777     0.3540 27.0000  -1.067 0.295350  
+
+GC.pheno.data$gt <- relevel(GC.pheno.data$gt, ref = "IMB211")
+lmer.height.GC.2 <- lmer(height_log2 ~ gt * trt + (1|rep), data = GC.pheno.data)
+summary.height.GC.2 <- summary(lmer.height.GC.2)$coefficient # shade becomes significant... although less 
+summary(lmer.height.GC.2)
+# Fixed effects: 
+#                 Estimate Std. Error      df t value Pr(>|t|)    
+# (Intercept)       5.2463     0.1739 27.0000  30.169  < 2e-16 ***
+# gtR500            1.4618     0.2459 27.0000   5.944 2.45e-06 ***
+# trtSHADE          0.6174     0.2546 27.0000   2.425   0.0223 *  
+# gtR500:trtSHADE   0.3777     0.3540 27.0000   1.067   0.2954    
+
+# model result 
+plot.height.GC <- pheno.plot.result.GC(summary.height.GC, summary.height.GC.2)
+plot.height.GC # not significant anymore... 
+save_plot("~/Desktop/test.png", plot.height.GC, base_aspect_ratio = 1.2)   
+```
+
+### bayesain method, brms  
 ```{r}
 
 ```
